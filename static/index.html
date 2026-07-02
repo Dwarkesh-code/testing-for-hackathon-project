@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proof-of-Work | Executive AI Portfolio Platform</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="glow-orb orb-1"></div>
+    <div class="glow-orb orb-2"></div>
+
+    <!-- Navigation -->
+    <header class="navbar">
+        <div class="logo">
+            <span class="logo-icon">⚡</span>
+            <span class="logo-text">Proof<span class="highlight">Of</span>Work</span>
+            <span class="badge">AI Pipeline</span>
+        </div>
+        <nav class="nav-links">
+            <a href="#generator" class="nav-item active">Generate</a>
+            <a href="#portfolio" class="nav-item">Portfolio Showcase</a>
+        </nav>
+    </header>
+
+    <main class="container">
+        <!-- Hero Input Section -->
+        <section id="generator" class="hero-section">
+            <div class="hero-text">
+                <h1>Verify Code. <br><span class="gradient-text">Showcase True Skills.</span></h1>
+                <p class="subtitle">AI parallel agents extract high-signal commits, evaluate real code, and synthesize your portfolio automatically.</p>
+            </div>
+
+            <div class="card glass-form">
+                <form id="portfolioForm">
+                    <div class="input-grid">
+                        <div class="field">
+                            <label for="github">GitHub Username *</label>
+                            <input type="text" id="github" placeholder="e.g. Dwarkesh-code" value="Dwarkesh-code" required>
+                        </div>
+                        <div class="field">
+                            <label for="leetcode">LeetCode Username</label>
+                            <input type="text" id="leetcode" placeholder="e.g. dwarkesh_algo">
+                        </div>
+                        <div class="field">
+                            <label for="linkedin">LinkedIn Profile URL</label>
+                            <input type="text" id="linkedin" placeholder="e.g. linkedin.com/in/dwarkesh">
+                        </div>
+                        <div class="field">
+                            <label for="credly">Credly Badges URL</label>
+                            <input type="text" id="credly" placeholder="e.g. credly.com/users/dwarkesh">
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-primary" id="submitBtn">
+                        <span class="btn-text">Synthesize Executive Portfolio</span>
+                        <span class="loader hidden"></span>
+                    </button>
+                </form>
+            </div>
+        </section>
+
+        <!-- Loading Status Box -->
+        <div id="loadingStatus" class="status-box glass hidden">
+            <div class="spinner"></div>
+            <div class="status-info">
+                <h3 id="statusHeading">AI Agents Running Parallel Chains...</h3>
+                <p id="statusSubtext">Filtering commits, pre-fetching source files, and evaluating UI screenshots via Vision VLM.</p>
+            </div>
+        </div>
+
+        <!-- Portfolio Render Area -->
+        <section id="portfolio" class="portfolio-section hidden">
+            <!-- Executive Bio Card -->
+            <div class="card bio-card glass">
+                <div class="bio-header">
+                    <div class="avatar-container">
+                        <img id="devAvatar" src="https://github.com/Dwarkesh-code.png" alt="Developer Avatar">
+                    </div>
+                    <div class="bio-titles">
+                        <h2 id="devName">Developer Name</h2>
+                        <h4 id="devHeadline">Synthesized Professional Headline</h4>
+                        <div class="social-badges" id="socialBadges"></div>
+                    </div>
+                </div>
+                <p id="devBio" class="bio-text">Executive summary synthesized from verified code evidence...</p>
+
+                <!-- Competencies Bar -->
+                <div class="skills-wrapper">
+                    <h5>Verified Competencies & Stack</h5>
+                    <div id="coreSkills" class="skills-grid"></div>
+                </div>
+            </div>
+
+            <h3 class="section-title"><span class="highlight">Verified</span> Project Showcase</h3>
+
+            <!-- Projects Grid -->
+            <div id="projectsGrid" class="projects-grid"></div>
+        </section>
+    </main>
+
+    <footer>
+        <p>Built with LangGraph Parallel Chains • Groq LLaMA 3.3 • NVIDIA NIM ReAct & Vision</p>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+langchain
+langchain-groq
+langchain-nvidia-ai-endpoints
+langgraph
+python-dotenv
+aiohttp
