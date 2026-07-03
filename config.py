@@ -88,6 +88,17 @@ class Config:
         "nvidia/llama-3.3-nemotron-super-49b-v1.5",  # good reasoning + tools
     ]
 
+        # ── NVIDIA Fallback Models 
+    NVIDIA_EXTRACTOR_FALLBACKS = [
+        "nvidia/nemotron-3-ultra-550b-a55b",           # Flagship 550B, 1M context, best for agentic reasoning
+        "nvidia/nemotron-3-super-120b-a12b",           # 120B MoE, excellent for coding and planning
+        "nvidia/llama-3.3-nemotron-super-49b-v1.5",    # Highly efficient for tool calling and reasoning
+        "mistralai/mistral-large-3-675b-instruct-2512",# SOTA general purpose MoE, great for agents
+        "deepseek-ai/deepseek-v4-pro",                 # 1M context, specialized for fast coding tasks
+        "qwen/qwen3.5-122b-a10b"                       # 122B MoE, agent-ready & tool calling
+    ]
+
+
     # ── Explicitly separated model roles ────────────────────────────────────
     # Previously all three of these shared one misleadingly-named "ROUTER_MODEL"
     # alias, which meant synthesis + vision-picking + extractor-fallback traffic
