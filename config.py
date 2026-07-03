@@ -93,7 +93,16 @@ class Config:
     # alias, which meant synthesis + vision-picking + extractor-fallback traffic
     # all piled onto a single Groq model/key pool. Split so each role is
     # independently tunable and easy to trace in usage dashboards.
-    SYNTHESIS_MODEL      = "mixtral-8x7b-32768"                          # final portfolio copywriting only
+    # mixtral-8x7b-32768 was decommissioned by Groq (removed from the platform) —
+    # every Stage B synthesis call was failing instantly and silently falling
+    # through to the bare-bones Python fallback in synthesizer.py. Replaced with
+    # a fallback LIST (same pattern as GROQ_EXTRACTOR_FALLBACKS) so one bad/rate-
+    # limited model doesn't take down the whole synthesis step again.
+    SYNTHESIS_MODELS      = [
+        "llama-3.3-70b-versatile",      # primary — strong instruction following for copywriting
+        "openai/gpt-oss-120b",          # fallback 1
+        "qwen/qwen3-32b",               # fallback 2 — fastest, 60 RPM
+    ]
     VISION_PICKER_MODEL  = "meta-llama/llama-4-scout-17b-16e-instruct"   # vision-capable — actually looks at images
     EXTRACTOR_MODEL       = "meta/llama-3.3-70b-instruct"                 # NVIDIA fallback alias (synthesizer safety net)
 

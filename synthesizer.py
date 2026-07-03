@@ -1,0 +1,358 @@
+"""
+Final Synthesizer — combines all parallel repo skill analyses, screenshots,
+and external profiles into a stunning executive Proof-of-Work portfolio JSON.
+
+Two stages:
+  Stage A (deterministic, no LLM): aggregate skills across all analyzed repos,
+           count how many repos/commits demonstrate each one, weight by
+           confidence_tier, and compute verified_score with a real formula
+           instead of letting an LLM invent a number.
+  Stage B (LLM): takes the clean, pre-scored data from Stage A and writes the
+           final copy (bios, headlines, taglines) — with explicit good/bad
+           examples and banned generic phrases so output can't collapse into
+           filler text.
+"""
+
+import json
+from typing import List, Dict, Any, Optional
+from langchain_groq import ChatGroq
+from langchain_nvidia_ai_endpoints import ChatNVIDIA
+from langchain_core.messages import SystemMessage, HumanMessage
+from config import config
+
+
+TIER_WEIGHT = {
+    "verified_in_code": 3,
+    "verified_in_commit_message": 2,
+    "inferred_from_context": 1,
+}
+
+BANNED_PHRASES = [
+    "passionate about", "proven track record", "strong skills in",
+    "detail-oriented", "hardworking", "results-driven", "team player",
+]
+
+
+def _is_rate_limit_error(e: Exception) -> bool:
+    msg = str(e).lower()
+    return any(t in msg for t in ("429", "rate limit", "rate_limit", "quota", "too many requests"))
+
+
+def _aggregate_skills(repo_results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Stage A — pure Python, no LLM call. Groups skills (case-insensitive exact
+    match on skill name) across all repos, weights occurrences by confidence
+    tier, and produces a deterministic verified_score.
+
+    verified_score formula — deliberately built from 4 independent signals so
+    that the very common case (a skill mentioned once, in one repo) still has
+    room to differentiate instead of every such skill landing on the exact
+    same number:
+      - tier weight        (verified_in_code > commit_message > inferred)
+      - repo_count         (same skill proven in multiple repos = stronger)
+      - evidence_count     (same skill cited more than once, even within one
+                             repo, e.g. two different files/functions)
+      - commit_sha bonus   (evidence traceable to an exact commit is a
+                             concretely stronger claim than one that isn't —
+                             previously this was captured by the extractor
+                             but silently dropped before scoring)
+    """
+    groups: Dict[str, Dict[str, Any]] = {}
+    for r in repo_results:
+        for s in r.get("skills_demonstrated", []):
+            skill_name = (s.get("skill") or "").strip()
+            key = skill_name.lower()
+            if not key:
+                continue
+            tier = s.get("confidence_tier", "inferred_from_context")
+            weight = TIER_WEIGHT.get(tier, 1)
+            commit_sha = s.get("commit_sha")
+            g = groups.setdefault(key, {
+                "skill": skill_name,
+                "weight_total": 0,
+                "evidences": [],
+                "_repos": set(),
+                "_has_commit_sha": False,
+            })
+            g["weight_total"] += weight
+            g["evidences"].append({
+                "repo": r.get("repo_name", ""),
+                "evidence": s.get("evidence", ""),
+                "tier": tier,
+                "commit_sha": commit_sha,
+            })
+            g["_repos"].add(r.get("repo_name", ""))
+            if commit_sha:
+                g["_has_commit_sha"] = True
+
+    result = []
+    for g in groups.values():
+        repo_count = len(g["_repos"])
+        evidence_count = len(g["evidences"])
+        has_commit_sha = g.pop("_has_commit_sha")
+        g["repo_count"] = repo_count
+        g["verified_score"] = min(100, (
+            35
+            + g["weight_total"] * 7          # tier strength (max 21 for 3x verified_in_code)
+            + repo_count * 5                  # cross-repo corroboration
+            + min(evidence_count - 1, 3) * 3  # repeat citations beyond the first
+            + (6 if has_commit_sha else 0)    # traceable to an exact commit
+        ))
+        del g["_repos"]
+        result.append(g)
+
+    result.sort(key=lambda x: x["verified_score"], reverse=True)
+    return result
+
+
+SYNTHESIZER_SYSTEM_PROMPT = """\
+You are writing the copy for a developer's executive Proof-of-Work portfolio page.
+
+You are given pre-aggregated, VERIFIED skill data — it has already been counted and
+scored deterministically. Your job is ONLY to turn this into clear, specific, well
+written text. You are a copywriter here, not a scorer.
+
+── Hard rules ──────────────────────────────────────────────────────
+1. Never invent facts, technologies, or numbers that are not present in the input data.
+2. Every sentence in a project's deep_summary must reference something concrete from
+   that project's evidence — a specific file, function, technology, or pattern. No
+   generic filler sentences.
+3. Never use these banned phrases, or close paraphrases of them: {banned}
+4. Do not repeat the same sentence structure across different projects' summaries —
+   vary how each one opens.
+5. verified_score values in core_competencies are given to you already in the input —
+   copy them exactly, do not recalculate or invent new ones.
+6. If leetcode_stats is present in the input, write a short 1-2 sentence
+   competitive_programming_summary using ONLY the numbers given (total solved,
+   difficulty split, top tags, contest rating if present). Never estimate or
+   round differently than what's given. If leetcode_stats is null, omit this
+   field entirely — do not invent a LeetCode presence.
+
+── Example: WEAK bio (never write like this) ───────────────────────
+"A passionate full-stack developer with strong skills in Python and web development,
+showing a proven track record of building projects."
+(Generic — could describe literally any developer. Rejected.)
+
+── Example: STRONG bio (write like this) ────────────────────────────
+"Built a three-stage LangGraph pipeline that fans out parallel repo analysis across
+rotating NVIDIA NIM and Groq model pools, keeping the whole run under free-tier rate
+limits — visible in the round-robin chain_index assignment in config.py."
+(Specific, cites real evidence, could only describe this developer.)
+──────────────────────────────────────────────────────────────────
+
+Output ONLY valid JSON matching exactly this schema:
+{{
+  "developer": {{
+    "name": "Developer Name",
+    "headline": "High-impact professional headline synthesizing their stack",
+    "executive_bio": "3-4 sentence synthesized professional overview based on verified contributions.",
+    "profiles": {{
+      "github": "...",
+      "leetcode": "...",
+      "linkedin": "...",
+      "credly": "..."
+    }}
+  }},
+  "competitive_programming": {{
+    "summary": "1-2 sentence summary using only given LeetCode numbers, or null if leetcode_stats was not provided",
+    "total_solved": 0,
+    "by_difficulty": {{"easy": 0, "medium": 0, "hard": 0}},
+    "top_tags": [{{"tag": "...", "count": 0}}],
+    "contest": {{"rating": null, "global_ranking": null, "top_percentage": null}}
+  }},
+  "core_competencies": [
+    {{
+      "category": "e.g. AI & NLP Engineering / Systems Architecture / Frontend Dev",
+      "skills": ["Skill 1", "Skill 2", "Skill 3"],
+      "verified_score": 95
+    }}
+  ],
+  "top_projects": [
+    {{
+      "repo_name": "Project Name",
+      "tagline": "Short punchy summary",
+      "deep_summary": "Detailed technical scope",
+      "best_screenshot_url": "URL or null",
+      "screenshot_caption": "Caption or null",
+      "live_repo_url": "URL",
+      "verified_skills": [
+        {{
+          "skill": "Specific skill name",
+          "evidence": "Concrete code proof",
+          "commit_url": "Full clickable commit URL if commit_sha exists"
+        }}
+      ]
+    }}
+  ]
+}}
+Do not output markdown code fences or explanatory text. Output ONLY pure JSON.\
+""".format(banned=", ".join(f'"{p}"' for p in BANNED_PHRASES))
+
+
+def synthesize_portfolio(
+    username: str,
+    repo_results: List[Dict[str, Any]],
+    leetcode_stats: Optional[Dict[str, Any]] = None,
+    linkedin: Optional[str] = None,
+    credly: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Stage A (deterministic) + Stage B (LLM copywriting) → final portfolio JSON.
+
+    leetcode_stats is the dict produced by leetcode/fetcher.py — pre-shaped
+    into {metric, value, confidence_tier} evidence, same pattern as GitHub
+    skills. It's already fetched by the time this runs (parallel node in
+    main.py), so this function does no network I/O for LeetCode — it just
+    folds the numbers into Stage A scoring and Stage B copy, same as any
+    other verified evidence source.
+    """
+    aggregated_skills = _aggregate_skills(repo_results)
+
+    leetcode_payload = None
+    if leetcode_stats:
+        leetcode_payload = {
+            "profile_url": leetcode_stats.get("profile_url"),
+            "total_solved": leetcode_stats.get("total_solved"),
+            "by_difficulty": leetcode_stats.get("by_difficulty"),
+            "top_tags": leetcode_stats.get("top_tags"),
+            "contest": leetcode_stats.get("contest"),
+            "evidence": leetcode_stats.get("evidence"),  # pre-scored, LLM must not recompute
+        }
+
+    payload = {
+        "developer_name": username,
+        "external_links": {
+            "github": f"https://github.com/{username}",
+            "leetcode": leetcode_stats.get("profile_url") if leetcode_stats else "Not provided",
+            "linkedin": linkedin or "Not provided",
+            "credly": credly or "Not provided"
+        },
+        "aggregated_skills": aggregated_skills,  # pre-scored — LLM must not recompute
+        "analyzed_repositories": repo_results,
+        "leetcode_stats": leetcode_payload,       # None if not provided/fetch failed
+    }
+
+    user_prompt = (
+        f"Write the portfolio copy for developer '{username}' from this verified data:\n\n"
+        + json.dumps(payload, indent=2)
+    )
+
+    messages = [
+        SystemMessage(content=SYNTHESIZER_SYSTEM_PROMPT),
+        HumanMessage(content=user_prompt)
+    ]
+
+    def _invoke(llm) -> Dict[str, Any]:
+        res = llm.invoke(messages)
+        text = res.content.strip()
+        if "```" in text:
+            text = text.split("```")[1].strip()
+            if text.startswith("json"):
+                text = text[4:].strip()
+        return json.loads(text)
+
+    # Stage B — try every Groq model in SYNTHESIS_MODELS in order. On a
+    # rate-limit-shaped error, retry the SAME model with a DIFFERENT key from
+    # the rotation pool before moving to the next model (same resilience
+    # pattern as llm/extractor.py — a single hardcoded model+key here was the
+    # root cause of Stage B silently falling all the way through to the bare
+    # Python fallback below).
+    for model_name in config.SYNTHESIS_MODELS:
+        groq_key = config.GROQ.get()
+        if not groq_key:
+            break
+        try:
+            print(f"[Synthesizer] Stage B: writing executive portfolio copy via Groq ({model_name})...")
+            return _invoke(ChatGroq(model=model_name, api_key=groq_key, temperature=0.3))
+        except Exception as e:
+            if _is_rate_limit_error(e):
+                retry_key = config.GROQ.get_excluding(groq_key)
+                if retry_key and retry_key != groq_key:
+                    try:
+                        print(f"[Synthesizer] {model_name} rate-limited — retrying with a different Groq key...")
+                        return _invoke(ChatGroq(model=model_name, api_key=retry_key, temperature=0.3))
+                    except Exception as e2:
+                        print(f"[Synthesizer] Retry with different Groq key also failed: {type(e2).__name__}: {str(e2)[:150]}")
+            print(f"[Synthesizer] Groq model {model_name} failed: {type(e).__name__}: {str(e)[:150]} — trying next...")
+
+    print("[Synthesizer] All Groq models failed — falling back to NVIDIA...")
+
+    nvidia_key = config.NVIDIA.get()
+    if nvidia_key:
+        try:
+            return _invoke(ChatNVIDIA(model=config.EXTRACTOR_MODEL, api_key=nvidia_key, temperature=0.3))
+        except Exception as e:
+            if _is_rate_limit_error(e):
+                retry_key = config.NVIDIA.get_excluding(nvidia_key)
+                if retry_key and retry_key != nvidia_key:
+                    try:
+                        print("[Synthesizer] NVIDIA rate-limited — retrying with a different NVIDIA key...")
+                        return _invoke(ChatNVIDIA(model=config.EXTRACTOR_MODEL, api_key=retry_key, temperature=0.3))
+                    except Exception as e2:
+                        print(f"[Synthesizer] Retry with different NVIDIA key also failed: {type(e2).__name__}: {str(e2)[:150]}")
+            print(f"[Synthesizer] NVIDIA failed: {type(e).__name__}: {str(e)[:150]}")
+
+    print("[Synthesizer] All models failed for Stage B — using deterministic fallback output (Stage A scores still real)")
+
+    # Fallback structure if both LLM calls fail — still uses real Stage A scores,
+    # so it stays "verified" even without a copywriting pass.
+    projects = []
+    for r in repo_results:
+        skills = []
+        for s in r.get("skills_demonstrated", []):
+            sha = s.get("commit_sha")
+            commit_url = f"https://github.com/{username}/{r['repo_name']}/commit/{sha}" if sha else None
+            skills.append({
+                "skill": s.get("skill", "Software Development"),
+                "evidence": s.get("evidence", ""),
+                "commit_url": commit_url
+            })
+        img = r.get("best_screenshot") or {}
+        projects.append({
+            "repo_name": r.get("repo_name", ""),
+            "tagline": r.get("summary", "")[:80],
+            "deep_summary": r.get("summary", ""),
+            "best_screenshot_url": img.get("url"),
+            "screenshot_caption": img.get("caption"),
+            "live_repo_url": r.get("repo_url", f"https://github.com/{username}/{r['repo_name']}"),
+            "verified_skills": skills
+        })
+
+    competitive_programming = None
+    if leetcode_payload:
+        competitive_programming = {
+            "summary": (
+                f"{leetcode_payload['total_solved']} problems solved on LeetCode "
+                f"({leetcode_payload['by_difficulty']['easy']} Easy / "
+                f"{leetcode_payload['by_difficulty']['medium']} Medium / "
+                f"{leetcode_payload['by_difficulty']['hard']} Hard)."
+            ),
+            "total_solved": leetcode_payload["total_solved"],
+            "by_difficulty": leetcode_payload["by_difficulty"],
+            "top_tags": leetcode_payload["top_tags"],
+            "contest": leetcode_payload["contest"],
+        }
+
+    return {
+        "developer": {
+            "name": username,
+            "headline": "Full-Stack Software Developer & Technical Contributor",
+            "executive_bio": f"Verified code contributor on GitHub across {len(projects)} high-signal repositories.",
+            "profiles": {
+                "github": f"https://github.com/{username}",
+                "leetcode": leetcode_payload.get("profile_url", "") if leetcode_payload else "",
+                "linkedin": linkedin or "",
+                "credly": credly or ""
+            }
+        },
+        "competitive_programming": competitive_programming,
+        "core_competencies": [
+            {
+                "category": g["skill"],
+                "skills": [g["skill"]],
+                "verified_score": g["verified_score"]
+            }
+            for g in aggregated_skills[:8]
+        ],
+        "top_projects": projects
+    }

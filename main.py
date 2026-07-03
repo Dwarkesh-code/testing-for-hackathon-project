@@ -30,6 +30,7 @@ from llm.vision import analyze_best_screenshot
 from llm.synthesizer import synthesize_portfolio
 from leetcode.fetcher import get_leetcode_stats
 from config import config
+from utils import normalize_handle
 
 fetcher = GitHubFetcher()
 
@@ -275,6 +276,12 @@ async def run_pipeline(
     linkedin: Optional[str] = None,
     credly: Optional[str] = None
 ) -> dict:
+    # Accept either a bare handle or a full profile URL from the frontend —
+    # every downstream fetcher builds API URLs by inserting this value
+    # directly, so it must be reduced to just the handle here, once.
+    username = normalize_handle(username, "github") or username
+    leetcode = normalize_handle(leetcode, "leetcode")
+
     print(f"\n{'═'*50}")
     print(f"  GitHub Proof-of-Work Pipeline: {username}")
     print(f"{'═'*50}")
