@@ -91,31 +91,54 @@ def analyze_best_screenshot(
     for c in candidates:
         content.append({"type": "image_url", "image_url": {"url": c["url"]}})
 
-    try:
-        groq_key = config.GROQ.get()
-        if groq_key:
-            llm = ChatGroq(model=config.VISION_PICKER_MODEL, api_key=groq_key, temperature=0.1)
-            response = llm.invoke([
-                SystemMessage(content=system_prompt),
-                HumanMessage(content=content)
-            ])
-            text = response.content.strip()
-            if "```" in text:
-                text = text.split("```")[1].strip()
-                if text.startswith("json"):
-                    text = text[4:].strip()
-            data = json.loads(text)
-            idx = int(data.get("best_index", 0))
-            if 0 <= idx < len(candidates):
-                return {
-                    "url": candidates[idx]["url"],
-                    "caption": data.get("caption", "Project UI Preview"),
-                    "score": float(data.get("score", 0.90))
-                }
-    except Exception as e:
-        print(f"[Vision] Could not evaluate via vision model for {repo_name}: {e}")
+    messages = [
+        SystemMessage(content=system_prompt),
+        HumanMessage(content=content)
+    ]
 
-    # Fallback: pick first candidate if the vision call fails or returns garbage
+    def _call(key: str) -> Optional[Dict[str, Any]]:
+        llm = ChatGroq(model=config.VISION_PICKER_MODEL, api_key=key, temperature=0.1)
+        response = llm.invoke(messages)
+        text = response.content.strip()
+        if "```" in text:
+            text = text.split("```")[1].strip()
+            if text.startswith("json"):
+                text = text[4:].strip()
+        data = json.loads(text)
+        idx = int(data.get("best_index", 0))
+        if 0 <= idx < len(candidates):
+            return {
+                "url": candidates[idx]["url"],
+                "caption": data.get("caption", "Project UI Preview"),
+                "score": float(data.get("score", 0.90))
+            }
+        raise ValueError(f"best_index {idx} out of range")
+
+    groq_key = config.GROQ.get()
+    if groq_key:
+        try:
+            result = _call(groq_key)
+            if result:
+                return result
+        except Exception as e:
+            msg = str(e).lower()
+            is_rate_limit = any(t in msg for t in ("429", "rate limit", "rate_limit", "quota", "too many requests"))
+            print(f"[Vision] {repo_name}: primary key failed ({type(e).__name__}) — {e}")
+            if is_rate_limit:
+                # Same pattern as extractor.py: retry once with a different key
+                # from the rotation pool before giving up on the vision model.
+                retry_key = config.GROQ.get_excluding(groq_key)
+                if retry_key and retry_key != groq_key:
+                    print(f"[Vision] {repo_name}: rate-limited — retrying with a different Groq key...")
+                    try:
+                        result = _call(retry_key)
+                        if result:
+                            return result
+                    except Exception as e2:
+                        print(f"[Vision] {repo_name}: retry with different key also failed: {e2}")
+
+    # Fallback: pick first candidate if the vision call fails or returns garbage,
+    # or if no Groq key is configured at all.
     return {
         "url": candidates[0]["url"],
         "caption": candidates[0]["caption"],

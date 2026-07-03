@@ -91,6 +91,11 @@ written text. You are a copywriter here, not a scorer.
    vary how each one opens.
 5. verified_score values in core_competencies are given to you already in the input —
    copy them exactly, do not recalculate or invent new ones.
+6. If leetcode_stats is present in the input, write a short 1-2 sentence
+   competitive_programming_summary using ONLY the numbers given (total solved,
+   difficulty split, top tags, contest rating if present). Never estimate or
+   round differently than what's given. If leetcode_stats is null, omit this
+   field entirely — do not invent a LeetCode presence.
 
 ── Example: WEAK bio (never write like this) ───────────────────────
 "A passionate full-stack developer with strong skills in Python and web development,
@@ -116,6 +121,13 @@ Output ONLY valid JSON matching exactly this schema:
       "linkedin": "...",
       "credly": "..."
     }}
+  }},
+  "competitive_programming": {{
+    "summary": "1-2 sentence summary using only given LeetCode numbers, or null if leetcode_stats was not provided",
+    "total_solved": 0,
+    "by_difficulty": {{"easy": 0, "medium": 0, "hard": 0}},
+    "top_tags": [{{"tag": "...", "count": 0}}],
+    "contest": {{"rating": null, "global_ranking": null, "top_percentage": null}}
   }},
   "core_competencies": [
     {{
@@ -149,25 +161,44 @@ Do not output markdown code fences or explanatory text. Output ONLY pure JSON.\
 def synthesize_portfolio(
     username: str,
     repo_results: List[Dict[str, Any]],
-    leetcode: Optional[str] = None,
+    leetcode_stats: Optional[Dict[str, Any]] = None,
     linkedin: Optional[str] = None,
     credly: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Stage A (deterministic) + Stage B (LLM copywriting) → final portfolio JSON.
+
+    leetcode_stats is the dict produced by leetcode/fetcher.py — pre-shaped
+    into {metric, value, confidence_tier} evidence, same pattern as GitHub
+    skills. It's already fetched by the time this runs (parallel node in
+    main.py), so this function does no network I/O for LeetCode — it just
+    folds the numbers into Stage A scoring and Stage B copy, same as any
+    other verified evidence source.
     """
     aggregated_skills = _aggregate_skills(repo_results)
+
+    leetcode_payload = None
+    if leetcode_stats:
+        leetcode_payload = {
+            "profile_url": leetcode_stats.get("profile_url"),
+            "total_solved": leetcode_stats.get("total_solved"),
+            "by_difficulty": leetcode_stats.get("by_difficulty"),
+            "top_tags": leetcode_stats.get("top_tags"),
+            "contest": leetcode_stats.get("contest"),
+            "evidence": leetcode_stats.get("evidence"),  # pre-scored, LLM must not recompute
+        }
 
     payload = {
         "developer_name": username,
         "external_links": {
             "github": f"https://github.com/{username}",
-            "leetcode": leetcode or "Not provided",
+            "leetcode": leetcode_stats.get("profile_url") if leetcode_stats else "Not provided",
             "linkedin": linkedin or "Not provided",
             "credly": credly or "Not provided"
         },
         "aggregated_skills": aggregated_skills,  # pre-scored — LLM must not recompute
-        "analyzed_repositories": repo_results
+        "analyzed_repositories": repo_results,
+        "leetcode_stats": leetcode_payload,       # None if not provided/fetch failed
     }
 
     user_prompt = (
@@ -234,6 +265,21 @@ def synthesize_portfolio(
             "verified_skills": skills
         })
 
+    competitive_programming = None
+    if leetcode_payload:
+        competitive_programming = {
+            "summary": (
+                f"{leetcode_payload['total_solved']} problems solved on LeetCode "
+                f"({leetcode_payload['by_difficulty']['easy']} Easy / "
+                f"{leetcode_payload['by_difficulty']['medium']} Medium / "
+                f"{leetcode_payload['by_difficulty']['hard']} Hard)."
+            ),
+            "total_solved": leetcode_payload["total_solved"],
+            "by_difficulty": leetcode_payload["by_difficulty"],
+            "top_tags": leetcode_payload["top_tags"],
+            "contest": leetcode_payload["contest"],
+        }
+
     return {
         "developer": {
             "name": username,
@@ -241,11 +287,12 @@ def synthesize_portfolio(
             "executive_bio": f"Verified code contributor on GitHub across {len(projects)} high-signal repositories.",
             "profiles": {
                 "github": f"https://github.com/{username}",
-                "leetcode": leetcode or "",
+                "leetcode": leetcode_payload.get("profile_url", "") if leetcode_payload else "",
                 "linkedin": linkedin or "",
                 "credly": credly or ""
             }
         },
+        "competitive_programming": competitive_programming,
         "core_competencies": [
             {
                 "category": g["skill"],

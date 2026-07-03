@@ -1,66 +1,53 @@
 """
-LangChain tools given to the NVIDIA NIM Extractor Agent.
+LangChain tools exposed to the Extractor react-agent (llm/extractor.py).
 
-The agent uses these tools to:
-1. List all files in a repo → decide which ones to read
-2. Fetch specific file content → read actual code
-
-This is the "GitHub API call capability" inside each parallel agent node.
+The extractor is pre-fed key_files from main.py, but for repos where the
+pre-fetch missed something relevant, the agent can pull more on its own
+using these two tools. Kept deliberately narrow (list + fetch) — no write
+access, no arbitrary shell, nothing that can wander outside the target repo.
 """
 
 import asyncio
-import concurrent.futures
-from typing import Annotated
-
 from langchain_core.tools import tool
 from github.fetcher import GitHubFetcher
 
 _fetcher = GitHubFetcher()
 
 
-def _run(coro):
-    """Run an async coroutine from sync context (tools are called synchronously by the agent)."""
-    try:
-        loop = asyncio.get_running_loop()
-        # We're inside an existing event loop — run in a thread
-        with concurrent.futures.ThreadPoolExecutor() as pool:
-            future = pool.submit(asyncio.run, coro)
-            return future.result(timeout=20)
-    except RuntimeError:
-        # No running loop — just run directly
-        return asyncio.run(coro)
+def _run_async(coro):
+    """
+    Tools are called synchronously by create_react_agent (which itself runs
+    inside asyncio.to_thread from main.py's analyze_repo_node — a plain OS
+    thread, no running event loop). asyncio.run() is safe here.
+    """
+    return asyncio.run(coro)
 
 
 @tool
-def list_repo_files(
-    owner: Annotated[str, "GitHub username or org name"],
-    repo:  Annotated[str, "Repository name"],
-) -> str:
+def list_repo_files(owner: str, repo: str, branch: str = "main") -> str:
     """
-    List all file paths inside a GitHub repository.
-    Use this first to understand the repo structure before fetching specific files.
+    List file paths in a GitHub repository (up to 80 files, recursive).
+    Use this when you need to see what's in the repo beyond the pre-fetched
+    key files — e.g. to find a config file, a specific module, or tests.
+    Returns a newline-separated list of file paths.
     """
-    files = _run(_fetcher.get_file_tree(owner, repo))
+    files = _run_async(_fetcher.get_file_tree(owner, repo, branch))
     if not files:
-        return f"Could not retrieve file tree for {owner}/{repo}."
-    return "Files in repo:\n" + "\n".join(files)
+        return "No files found (repo may be empty or branch name incorrect)."
+    return "\n".join(files)
 
 
 @tool
-def fetch_file_from_github(
-    owner:    Annotated[str, "GitHub username or org name"],
-    repo:     Annotated[str, "Repository name"],
-    filepath: Annotated[str, "File path inside the repo, e.g. 'src/main.py' or 'package.json'"],
-) -> str:
+def fetch_file_from_github(owner: str, repo: str, path: str) -> str:
     """
-    Fetch and return the content of a specific file from a GitHub repository.
-    Use this after listing files to read actual code and understand what was implemented.
+    Fetch the content of a specific file from a GitHub repository.
+    Use this after list_repo_files to inspect a file's actual code.
+    Returns up to the first 2500 characters of the file content.
     """
-    content = _run(_fetcher.get_file(owner, repo, filepath))
-    if content:
-        return f"=== {filepath} ===\n{content}"
-    return f"File '{filepath}' not found or empty in {owner}/{repo}."
+    content = _run_async(_fetcher.get_file(owner, repo, path))
+    if not content:
+        return f"Could not fetch '{path}' — file may not exist or is binary/empty."
+    return content
 
 
-# Exported list for the agent
 GITHUB_TOOLS = [list_repo_files, fetch_file_from_github]

@@ -59,6 +59,10 @@ def select_top_repos(repos_with_readmes: List[Dict], top_n: int = None) -> List[
     # Build router LLM with fallbacks
     # Primary: qwen/qwen3-32b (60 RPM — fastest free tier on Groq)
     groq_key = config.GROQ.get()
+    if not groq_key:
+        print("[Router] No Groq key configured — using fallback ranking")
+        return [r["name"] for r in repos_with_readmes[:top_n]]
+
     router_llms = [
         ChatGroq(model=m, api_key=groq_key, temperature=0.1)
         for m in config.GROQ_ROUTER_MODELS

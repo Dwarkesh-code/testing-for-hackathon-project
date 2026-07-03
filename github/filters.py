@@ -1,6 +1,7 @@
 import re
 from datetime import datetime, timezone
 from typing import List, Dict
+from config import config
 
 # ── Commit message patterns ─────────────────────────────────────────────────
 
@@ -52,7 +53,7 @@ def filter_repos(raw_repos: List[Dict]) -> List[Dict]:
     - Skip repos with no name
 
     Then rank by: stars + recency + has description
-    Return top 12 candidates for the Router LLM to decide from.
+    Return top config.MAX_CANDIDATE_REPOS candidates for the Router LLM to decide from.
     """
     candidates = []
     for r in raw_repos:
@@ -76,7 +77,7 @@ def filter_repos(raw_repos: List[Dict]) -> List[Dict]:
         return stars + has_desc + recency
 
     candidates.sort(key=activity_score, reverse=True)
-    return candidates[:12]
+    return candidates[:config.MAX_CANDIDATE_REPOS]
 
 
 def filter_commits(raw_commits: List[Dict]) -> List[Dict]:
@@ -87,7 +88,7 @@ def filter_commits(raw_commits: List[Dict]) -> List[Dict]:
     - Skip commits shorter than 10 chars
     - Skip commits matching NOISE_PATTERNS
     - Score remaining by HIGH_SIGNAL_PATTERNS
-    - Return top 15 by signal score
+    - Return top config.MAX_COMMITS by signal score
     """
     scored = []
     for c in raw_commits:
@@ -111,4 +112,4 @@ def filter_commits(raw_commits: List[Dict]) -> List[Dict]:
         scored.append({"commit": c, "score": signal})
 
     scored.sort(key=lambda x: x["score"], reverse=True)
-    return [item["commit"] for item in scored[:15]]
+    return [item["commit"] for item in scored[:config.MAX_COMMITS]]

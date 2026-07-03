@@ -1,111 +1,500 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Proof-of-Work | Executive AI Portfolio Platform</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Proof-of-Work Portfolio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0D1117;
+    --bg-raised: #131A22;
+    --bg-card: #161D26;
+    --border: #262E38;
+    --text: #E6EDF3;
+    --text-dim: #8B96A3;
+    --text-faint: #576270;
+    --verified: #3FB950;
+    --verified-dim: #1C3B26;
+    --commit: #D29922;
+    --commit-dim: #3B2F14;
+    --inferred: #576270;
+    --leet-accent: #7C6FE0;
+    --leet-dim: #221F3B;
+    --font-display: 'Inter', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+  *{ box-sizing: border-box; margin:0; padding:0; }
+  body{
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-display);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection{ background: var(--verified-dim); color: var(--verified); }
+
+  /* ── layout shell ─────────────────────────────────── */
+  .wrap{ max-width: 1100px; margin: 0 auto; padding: 0 24px 96px; }
+
+  /* ── header / hero ────────────────────────────────── */
+  header.hero{
+    padding: 56px 0 40px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 40px;
+  }
+  .eyebrow{
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--verified);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 18px;
+  }
+  .eyebrow::before{ content:''; width:6px; height:6px; border-radius:50%; background: var(--verified); box-shadow: 0 0 8px var(--verified); }
+
+  h1.headline{
+    font-size: clamp(28px, 4vw, 42px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    margin-bottom: 16px;
+    max-width: 780px;
+  }
+  p.bio{
+    font-size: 16px;
+    color: var(--text-dim);
+    max-width: 640px;
+    margin-bottom: 24px;
+  }
+  .profile-links{ display:flex; gap:10px; flex-wrap:wrap; }
+  .profile-links a{
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--text);
+    text-decoration: none;
+    padding: 7px 14px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-raised);
+    transition: border-color .15s ease, transform .15s ease;
+  }
+  .profile-links a:hover{ border-color: var(--verified); transform: translateY(-1px); }
+
+  /* ── section headers ──────────────────────────────── */
+  .section-head{
+    display:flex; align-items:baseline; justify-content:space-between;
+    margin-bottom: 20px;
+  }
+  .section-head h2{ font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
+  .section-head .count{ font-family: var(--font-mono); font-size: 13px; color: var(--text-faint); }
+
+  /* ── evidence-tier legend (signature element, reused everywhere) ─── */
+  .legend{
+    display:flex; gap:18px; flex-wrap:wrap;
+    font-family: var(--font-mono); font-size: 11.5px; color: var(--text-faint);
+    margin-bottom: 28px; padding: 12px 16px;
+    background: var(--bg-raised); border: 1px solid var(--border); border-radius: 8px;
+  }
+  .legend span{ display:flex; align-items:center; gap:6px; }
+  .dot{ width:8px; height:8px; border-radius:50%; display:inline-block; flex-shrink:0; }
+  .dot.verified_in_code{ background: var(--verified); box-shadow: 0 0 5px var(--verified); }
+  .dot.verified_in_commit_message{ background: var(--commit); }
+  .dot.inferred_from_context{ background: transparent; border: 1.5px solid var(--inferred); }
+  .dot.verified_in_platform_stats{ background: var(--leet-accent); box-shadow: 0 0 5px var(--leet-accent); }
+
+  /* ── competency bars ──────────────────────────────── */
+  .competencies{ margin-bottom: 56px; }
+  .comp-grid{ display:grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap:14px; }
+  .comp-card{
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .comp-card .cat{ font-size: 13px; color: var(--text-dim); margin-bottom: 10px; font-weight: 600; }
+  .comp-bar-track{ height: 6px; background: var(--bg-raised); border-radius: 3px; overflow:hidden; margin-bottom: 8px; }
+  .comp-bar-fill{ height:100%; background: linear-gradient(90deg, var(--verified), #7EE08A); border-radius:3px; }
+  .comp-score{ font-family: var(--font-mono); font-size: 12px; color: var(--verified); }
+
+  /* ── repo card grid ───────────────────────────────── */
+  .repo-grid{
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 20px;
+    margin-bottom: 60px;
+  }
+  .repo-card{
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: border-color .18s ease, transform .18s ease;
+  }
+  .repo-card:hover{ border-color: #38424E; transform: translateY(-3px); }
+
+  .repo-shot{
+    width: 100%; aspect-ratio: 16/9;
+    background: var(--bg-raised);
+    position: relative;
+    overflow: hidden;
+    border-bottom: 1px solid var(--border);
+  }
+  .repo-shot img{ width:100%; height:100%; object-fit: cover; display:block; }
+  .repo-shot .no-shot{
+    width:100%; height:100%; display:flex; align-items:center; justify-content:center;
+    font-family: var(--font-mono); font-size: 12px; color: var(--text-faint);
+  }
+  .repo-shot .caption{
+    position:absolute; bottom:0; left:0; right:0;
+    background: linear-gradient(transparent, rgba(0,0,0,.75));
+    color:#fff; font-size: 11.5px; padding: 18px 12px 8px;
+    font-family: var(--font-mono);
+  }
+
+  .repo-body{ padding: 18px 18px 20px; display:flex; flex-direction:column; gap:12px; flex:1; }
+  .repo-name{
+    font-family: var(--font-mono); font-weight: 700; font-size: 15px;
+    display:flex; align-items:center; justify-content: space-between; gap: 8px;
+  }
+  .repo-name a{ color: var(--text); text-decoration:none; }
+  .repo-name a:hover{ color: var(--verified); }
+  .repo-name svg{ color: var(--text-faint); flex-shrink:0; }
+
+  .repo-tagline{ font-size: 13.5px; color: var(--text-dim); }
+
+  .skill-chips{ display:flex; flex-wrap:wrap; gap:6px; margin-top: 4px; }
+  .chip{
+    font-family: var(--font-mono); font-size: 11px;
+    display:flex; align-items:center; gap:5px;
+    padding: 4px 9px; border-radius: 20px;
+    background: var(--bg-raised); border: 1px solid var(--border); color: var(--text-dim);
+    cursor: default;
+  }
+  .chip .dot{ width:6px; height:6px; }
+
+  .evidence-list{
+    margin-top: 4px; padding-top: 12px; border-top: 1px dashed var(--border);
+    display:flex; flex-direction: column; gap: 8px;
+  }
+  .evidence-item{ font-size: 12px; color: var(--text-faint); display:flex; gap:8px; }
+  .evidence-item .dot{ margin-top: 4px; flex-shrink:0; }
+  .evidence-item code{ font-family: var(--font-mono); color: var(--text-dim); font-size: 11.5px; }
+
+  /* ── LeetCode section ─────────────────────────────── */
+  .leet-section{
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 28px 28px 24px;
+    margin-bottom: 60px;
+    position: relative;
+    overflow: hidden;
+  }
+  .leet-section::before{
+    content:'';
+    position:absolute; top:-40%; right:-10%; width:280px; height:280px;
+    background: radial-gradient(circle, var(--leet-dim), transparent 70%);
+    pointer-events:none;
+  }
+  .leet-top{ display:flex; justify-content: space-between; align-items:flex-start; flex-wrap:wrap; gap: 20px; margin-bottom: 24px; position:relative; }
+  .leet-solved{ }
+  .leet-solved .big{ font-family: var(--font-mono); font-size: 44px; font-weight: 700; color: var(--leet-accent); line-height:1; }
+  .leet-solved .label{ font-size: 13px; color: var(--text-dim); margin-top: 6px; }
+
+  .diff-bars{ display:flex; gap: 20px; }
+  .diff-bar-col{ text-align:center; }
+  .diff-track{
+    width: 34px; height: 90px; background: var(--bg-raised); border-radius: 6px;
+    display:flex; align-items:flex-end; overflow:hidden; border: 1px solid var(--border);
+  }
+  .diff-fill{ width:100%; border-radius: 0 0 5px 5px; }
+  .diff-fill.easy{ background: var(--verified); }
+  .diff-fill.medium{ background: var(--commit); }
+  .diff-fill.hard{ background: #F85149; }
+  .diff-count{ font-family: var(--font-mono); font-size: 13px; margin-top: 8px; font-weight: 600; }
+  .diff-label{ font-size: 10.5px; color: var(--text-faint); text-transform: uppercase; letter-spacing: .04em; margin-top: 2px; }
+
+  .leet-contest{
+    font-family: var(--font-mono); font-size: 12.5px; color: var(--text-dim);
+    background: var(--bg-raised); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 14px; display:inline-flex; gap: 16px; margin-bottom: 20px; position:relative;
+  }
+  .leet-contest b{ color: var(--leet-accent); }
+
+  .tag-pills{ display:flex; flex-wrap:wrap; gap: 8px; position:relative; }
+  .tag-pill{
+    font-family: var(--font-mono); font-size: 12px;
+    padding: 6px 12px; border-radius: 20px;
+    background: var(--leet-dim); border: 1px solid #362F5C; color: #C4BDF0;
+  }
+  .tag-pill b{ color: var(--leet-accent); }
+
+  .leet-empty{ color: var(--text-faint); font-size: 13.5px; font-family: var(--font-mono); }
+
+  /* ── footer ────────────────────────────────────────── */
+  footer{ text-align:center; padding: 40px 0 0; color: var(--text-faint); font-size: 12px; font-family: var(--font-mono); }
+
+  @media (max-width: 560px){
+    .repo-grid{ grid-template-columns: 1fr; }
+    .leet-top{ flex-direction: column; }
+  }
+</style>
 </head>
 <body>
-    <div class="glow-orb orb-1"></div>
-    <div class="glow-orb orb-2"></div>
 
-    <!-- Navigation -->
-    <header class="navbar">
-        <div class="logo">
-            <span class="logo-icon">⚡</span>
-            <span class="logo-text">Proof<span class="highlight">Of</span>Work</span>
-            <span class="badge">AI Pipeline</span>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="eyebrow" id="eyebrow">verified proof-of-work</div>
+    <h1 class="headline" id="headline">Enter a GitHub username below to begin</h1>
+    <p class="bio" id="bio">Nothing is fetched until you submit the form — no default account is queried automatically.</p>
+    <div class="profile-links" id="profile-links"></div>
+  </header>
+
+  <section id="input-section" style="margin-bottom: 40px;">
+    <div class="leet-section" style="padding-top:24px; padding-bottom:24px;">
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap:12px; margin-bottom:16px; position:relative;">
+        <div>
+          <label style="font-family:var(--font-mono); font-size:11px; color:var(--text-faint); display:block; margin-bottom:6px;">GITHUB USERNAME *</label>
+          <input id="in-github" type="text" placeholder="e.g. octocat" style="width:100%; background:var(--bg-raised); border:1px solid var(--border); color:var(--text); padding:9px 12px; border-radius:6px; font-family:var(--font-mono); font-size:13px;">
         </div>
-        <nav class="nav-links">
-            <a href="#generator" class="nav-item active">Generate</a>
-            <a href="#portfolio" class="nav-item">Portfolio Showcase</a>
-        </nav>
-    </header>
-
-    <main class="container">
-        <!-- Hero Input Section -->
-        <section id="generator" class="hero-section">
-            <div class="hero-text">
-                <h1>Verify Code. <br><span class="gradient-text">Showcase True Skills.</span></h1>
-                <p class="subtitle">AI parallel agents extract high-signal commits, evaluate real code, and synthesize your portfolio automatically.</p>
-            </div>
-
-            <div class="card glass-form">
-                <form id="portfolioForm">
-                    <div class="input-grid">
-                        <div class="field">
-                            <label for="github">GitHub Username *</label>
-                            <input type="text" id="github" placeholder="e.g. Dwarkesh-code" value="Dwarkesh-code" required>
-                        </div>
-                        <div class="field">
-                            <label for="leetcode">LeetCode Username</label>
-                            <input type="text" id="leetcode" placeholder="e.g. dwarkesh_algo">
-                        </div>
-                        <div class="field">
-                            <label for="linkedin">LinkedIn Profile URL</label>
-                            <input type="text" id="linkedin" placeholder="e.g. linkedin.com/in/dwarkesh">
-                        </div>
-                        <div class="field">
-                            <label for="credly">Credly Badges URL</label>
-                            <input type="text" id="credly" placeholder="e.g. credly.com/users/dwarkesh">
-                        </div>
-                    </div>
-
-                    <button type="submit" class="btn-primary" id="submitBtn">
-                        <span class="btn-text">Synthesize Executive Portfolio</span>
-                        <span class="loader hidden"></span>
-                    </button>
-                </form>
-            </div>
-        </section>
-
-        <!-- Loading Status Box -->
-        <div id="loadingStatus" class="status-box glass hidden">
-            <div class="spinner"></div>
-            <div class="status-info">
-                <h3 id="statusHeading">AI Agents Running Parallel Chains...</h3>
-                <p id="statusSubtext">Filtering commits, pre-fetching source files, and evaluating UI screenshots via Vision VLM.</p>
-            </div>
+        <div>
+          <label style="font-family:var(--font-mono); font-size:11px; color:var(--text-faint); display:block; margin-bottom:6px;">LEETCODE USERNAME (optional)</label>
+          <input id="in-leetcode" type="text" placeholder="leave blank to skip" style="width:100%; background:var(--bg-raised); border:1px solid var(--border); color:var(--text); padding:9px 12px; border-radius:6px; font-family:var(--font-mono); font-size:13px;">
         </div>
+        <div>
+          <label style="font-family:var(--font-mono); font-size:11px; color:var(--text-faint); display:block; margin-bottom:6px;">LINKEDIN (optional)</label>
+          <input id="in-linkedin" type="text" placeholder="leave blank to skip" style="width:100%; background:var(--bg-raised); border:1px solid var(--border); color:var(--text); padding:9px 12px; border-radius:6px; font-family:var(--font-mono); font-size:13px;">
+        </div>
+      </div>
+      <button id="generate-btn" style="font-family:var(--font-mono); font-size:13px; font-weight:600; background:var(--verified); color:#0D1117; border:none; padding:10px 22px; border-radius:6px; cursor:pointer;">Generate portfolio →</button>
+      <span id="input-hint" style="font-family:var(--font-mono); font-size:12px; color:var(--text-faint); margin-left:12px;">nothing runs until you click this</span>
+    </div>
+  </section>
 
-        <!-- Portfolio Render Area -->
-        <section id="portfolio" class="portfolio-section hidden">
-            <!-- Executive Bio Card -->
-            <div class="card bio-card glass">
-                <div class="bio-header">
-                    <div class="avatar-container">
-                        <img id="devAvatar" src="https://github.com/Dwarkesh-code.png" alt="Developer Avatar">
-                    </div>
-                    <div class="bio-titles">
-                        <h2 id="devName">Developer Name</h2>
-                        <h4 id="devHeadline">Synthesized Professional Headline</h4>
-                        <div class="social-badges" id="socialBadges"></div>
-                    </div>
-                </div>
-                <p id="devBio" class="bio-text">Executive summary synthesized from verified code evidence...</p>
+  <div class="legend">
+    <span><i class="dot verified_in_code"></i> verified in code</span>
+    <span><i class="dot verified_in_commit_message"></i> verified in commit message</span>
+    <span><i class="dot inferred_from_context"></i> inferred from context</span>
+    <span><i class="dot verified_in_platform_stats"></i> verified platform stat</span>
+  </div>
 
-                <!-- Competencies Bar -->
-                <div class="skills-wrapper">
-                    <h5>Verified Competencies & Stack</h5>
-                    <div id="coreSkills" class="skills-grid"></div>
-                </div>
-            </div>
+  <section class="competencies" id="competencies-section" style="display:none">
+    <div class="section-head"><h2>Core competencies</h2></div>
+    <div class="comp-grid" id="comp-grid"></div>
+  </section>
 
-            <h3 class="section-title"><span class="highlight">Verified</span> Project Showcase</h3>
+  <section id="leet-wrap" style="display:none">
+    <div class="section-head"><h2>Competitive programming</h2></div>
+    <div class="leet-section" id="leet-section"></div>
+  </section>
 
-            <!-- Projects Grid -->
-            <div id="projectsGrid" class="projects-grid"></div>
-        </section>
-    </main>
+  <section>
+    <div class="section-head">
+      <h2>Verified projects</h2>
+      <span class="count" id="repo-count"></span>
+    </div>
+    <div class="repo-grid" id="repo-grid"></div>
+  </section>
 
-    <footer>
-        <p>Built with LangGraph Parallel Chains • Groq LLaMA 3.3 • NVIDIA NIM ReAct & Vision</p>
-    </footer>
+  <footer>generated from real commits, real files, real platform stats — nothing self-reported</footer>
+</div>
 
-    <script src="app.js"></script>
+<script>
+const TIER_LABEL = {
+  verified_in_code: 'verified in code',
+  verified_in_commit_message: 'verified in commit',
+  inferred_from_context: 'inferred',
+  verified_in_platform_stats: 'platform stat'
+};
+
+function el(html){ const d=document.createElement('div'); d.innerHTML=html.trim(); return d.firstChild; }
+
+function renderProfileLinks(profiles){
+  const wrap = document.getElementById('profile-links');
+  if(!profiles) return;
+  const map = { github:'GitHub', leetcode:'LeetCode', linkedin:'LinkedIn', credly:'Credly' };
+  Object.entries(map).forEach(([key,label])=>{
+    const url = profiles[key];
+    if(url && url !== 'Not provided'){
+      wrap.appendChild(el(`<a href="${url}" target="_blank" rel="noopener">${label} →</a>`));
+    }
+  });
+}
+
+function renderCompetencies(list){
+  if(!list || !list.length) return;
+  document.getElementById('competencies-section').style.display = 'block';
+  const grid = document.getElementById('comp-grid');
+  list.forEach(c=>{
+    const score = c.verified_score ?? 0;
+    grid.appendChild(el(`
+      <div class="comp-card">
+        <div class="cat">${c.category}</div>
+        <div class="comp-bar-track"><div class="comp-bar-fill" style="width:${score}%"></div></div>
+        <div class="comp-score">${score}/100</div>
+      </div>
+    `));
+  });
+}
+
+function renderLeetcode(cp){
+  const wrapSection = document.getElementById('leet-wrap');
+  const box = document.getElementById('leet-section');
+  if(!cp || cp.total_solved === undefined || cp.total_solved === null){
+    return; // no leetcode data — section stays hidden entirely
+  }
+  wrapSection.style.display = 'block';
+
+  const d = cp.by_difficulty || {easy:0, medium:0, hard:0};
+  const maxCount = Math.max(d.easy, d.medium, d.hard, 1);
+
+  let html = `
+    <div class="leet-top">
+      <div class="leet-solved">
+        <div class="big">${cp.total_solved}</div>
+        <div class="label">problems solved</div>
+      </div>
+      <div class="diff-bars">
+        <div class="diff-bar-col">
+          <div class="diff-track"><div class="diff-fill easy" style="height:${(d.easy/maxCount*100)}%"></div></div>
+          <div class="diff-count" style="color:var(--verified)">${d.easy}</div>
+          <div class="diff-label">Easy</div>
+        </div>
+        <div class="diff-bar-col">
+          <div class="diff-track"><div class="diff-fill medium" style="height:${(d.medium/maxCount*100)}%"></div></div>
+          <div class="diff-count" style="color:var(--commit)">${d.medium}</div>
+          <div class="diff-label">Medium</div>
+        </div>
+        <div class="diff-bar-col">
+          <div class="diff-track"><div class="diff-fill hard" style="height:${(d.hard/maxCount*100)}%"></div></div>
+          <div class="diff-count" style="color:#F85149">${d.hard}</div>
+          <div class="diff-label">Hard</div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  if(cp.contest && cp.contest.rating){
+    html += `
+      <div class="leet-contest">
+        <span>rating <b>${cp.contest.rating}</b></span>
+        <span>global rank <b>#${cp.contest.global_ranking ?? '—'}</b></span>
+        ${cp.contest.top_percentage ? `<span>top <b>${cp.contest.top_percentage.toFixed?.(1) ?? cp.contest.top_percentage}%</b></span>` : ''}
+      </div>
+    `;
+  }
+
+  if(cp.top_tags && cp.top_tags.length){
+    html += `<div class="tag-pills">` +
+      cp.top_tags.slice(0,8).map(t=>`<span class="tag-pill">${t.tag} <b>${t.count}</b></span>`).join('') +
+      `</div>`;
+  }
+
+  box.innerHTML = html;
+}
+
+function renderRepoCard(project){
+  const skills = project.verified_skills || [];
+  const shot = project.best_screenshot_url;
+
+  const chipsHtml = skills.map(s=>{
+    const tier = s.confidence_tier || (s.commit_url ? 'verified_in_commit_message' : 'inferred_from_context');
+    return `<span class="chip"><i class="dot ${tier}"></i>${s.skill}</span>`;
+  }).join('');
+
+  const evidenceHtml = skills.slice(0,3).map(s=>{
+    const tier = s.confidence_tier || (s.commit_url ? 'verified_in_commit_message' : 'inferred_from_context');
+    return `<div class="evidence-item"><i class="dot ${tier}"></i><span><code>${s.skill}</code> — ${s.evidence || ''}</span></div>`;
+  }).join('');
+
+  return el(`
+    <div class="repo-card">
+      <div class="repo-shot">
+        ${shot
+          ? `<img src="${shot}" alt="${project.screenshot_caption || project.repo_name}" onerror="this.parentElement.innerHTML='<div class=&quot;no-shot&quot;>no preview available</div>'">`
+          : `<div class="no-shot">no preview available</div>`
+        }
+        ${project.screenshot_caption && shot ? `<div class="caption">${project.screenshot_caption}</div>` : ''}
+      </div>
+      <div class="repo-body">
+        <div class="repo-name">
+          <a href="${project.live_repo_url}" target="_blank" rel="noopener">${project.repo_name}</a>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7M17 7H7M17 7V17"/></svg>
+        </div>
+        <div class="repo-tagline">${project.tagline || ''}</div>
+        <div class="skill-chips">${chipsHtml}</div>
+        ${evidenceHtml ? `<div class="evidence-list">${evidenceHtml}</div>` : ''}
+      </div>
+    </div>
+  `);
+}
+
+function renderPortfolio(portfolio){
+  const dev = portfolio.developer || {};
+  document.getElementById('headline').textContent = dev.headline || dev.name || 'Developer Portfolio';
+  document.getElementById('bio').textContent = dev.executive_bio || '';
+  renderProfileLinks(dev.profiles);
+
+  renderCompetencies(portfolio.core_competencies);
+  renderLeetcode(portfolio.competitive_programming);
+
+  const projects = portfolio.top_projects || [];
+  document.getElementById('repo-count').textContent = `${projects.length} repositor${projects.length===1?'y':'ies'} analyzed`;
+  const grid = document.getElementById('repo-grid');
+  grid.innerHTML = '';
+  if(!projects.length){
+    grid.appendChild(el(`<div class="leet-empty">No repositories analyzed yet.</div>`));
+  } else {
+    projects.forEach(p => grid.appendChild(renderRepoCard(p)));
+  }
+}
+
+async function generatePortfolio(username, leetcode, linkedin, credly){
+  document.getElementById('headline').textContent = `Analyzing ${username}'s work…`;
+  document.getElementById('bio').textContent = 'Fetching repos, commits, and LeetCode stats — this runs real verification, so it can take a minute.';
+  try{
+    const res = await fetch('/api/generate-portfolio', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({username, leetcode, linkedin, credly})
+    });
+    const data = await res.json();
+    if(data.status === 'success'){
+      renderPortfolio(data.portfolio);
+    } else {
+      document.getElementById('headline').textContent = 'Something went wrong';
+      document.getElementById('bio').textContent = data.message || 'Unknown error.';
+    }
+  } catch(e){
+    document.getElementById('headline').textContent = 'Could not reach the pipeline';
+    document.getElementById('bio').textContent = String(e);
+  }
+}
+
+// Nothing runs automatically. The pipeline only fires when the person
+// explicitly submits the form below — no default/demo account is ever
+// queried without the user typing it in themselves.
+document.getElementById('generate-btn').addEventListener('click', () => {
+  const gh = document.getElementById('in-github').value.trim();
+  const lc = document.getElementById('in-leetcode').value.trim();
+  const li = document.getElementById('in-linkedin').value.trim();
+  const hint = document.getElementById('input-hint');
+
+  if(!gh){
+    hint.textContent = 'GitHub username is required';
+    hint.style.color = '#F85149';
+    return;
+  }
+  hint.textContent = 'running…';
+  hint.style.color = 'var(--text-faint)';
+  generatePortfolio(gh, lc, li, '');
+});
+</script>
 </body>
 </html>

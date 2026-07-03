@@ -19,7 +19,7 @@ import json
 import operator
 from typing import TypedDict, Annotated, List, Optional, Dict, Any
 
-from langgraph.graph import StateGraph, END
+from langgraph.graph import StateGraph, START, END
 from langgraph.types import Send
 
 from github.fetcher import GitHubFetcher
@@ -28,6 +28,7 @@ from llm.router import select_top_repos
 from llm.extractor import extract_skills
 from llm.vision import analyze_best_screenshot
 from llm.synthesizer import synthesize_portfolio
+from leetcode.fetcher import get_leetcode_stats
 from config import config
 
 fetcher = GitHubFetcher()
@@ -46,6 +47,7 @@ class PipelineState(TypedDict):
     repos_with_readmes: List[dict]  # filtered_repos + readme_snippet added
     top_repos:         List[dict]   # selected by Router LLM
     repo_results:      Annotated[List[dict], operator.add]  # accumulated from parallel nodes
+    leetcode_stats:    Optional[dict]  # fetched in parallel with GitHub, deterministic (no LLM)
     final_portfolio:   dict
 
 
@@ -59,10 +61,30 @@ class RepoState(TypedDict):
 # ── Node: Fetch all repos from GitHub ──────────────────────────────────────
 
 async def fetch_repos_node(state: PipelineState) -> dict:
-    print(f"\n[Step 1] Fetching repos for: {state['username']}")
+    print(f"\n[Step 1a] Fetching repos for: {state['username']}")
     raw = await fetcher.get_repos(state["username"])
-    print(f"[Step 1] Found {len(raw)} public repos")
+    print(f"[Step 1a] Found {len(raw)} public repos")
     return {"raw_repos": raw}
+
+
+# ── Node: Fetch LeetCode stats (runs in parallel with GitHub fetch) ────────
+# Pure deterministic aggregation — no LLM involved, same spirit as the
+# Python-only repo/commit filters. Never blocks or fails the rest of the
+# pipeline: a missing/private/invalid LeetCode profile just means the final
+# portfolio has no LeetCode section, not a crashed run.
+
+async def fetch_leetcode_node(state: PipelineState) -> dict:
+    leetcode_username = state.get("leetcode")
+    if not leetcode_username:
+        print(f"\n[Step 1b] No LeetCode username provided — skipping")
+        return {"leetcode_stats": None}
+    print(f"\n[Step 1b] Fetching LeetCode stats for: {leetcode_username}")
+    stats = await get_leetcode_stats(leetcode_username)
+    if stats:
+        print(f"[Step 1b] LeetCode: {stats['total_solved']} problems solved")
+    else:
+        print(f"[Step 1b] Could not fetch LeetCode stats — continuing without them")
+    return {"leetcode_stats": stats}
 
 
 # ── Node: Python filter (no LLM) ───────────────────────────────────────────
@@ -184,7 +206,7 @@ async def synthesize_node(state: PipelineState) -> dict:
         synthesize_portfolio,
         state["username"],
         state["repo_results"],
-        state.get("leetcode"),
+        state.get("leetcode_stats"),
         state.get("linkedin"),
         state.get("credly")
     )
@@ -199,6 +221,7 @@ def build_pipeline():
 
     # Sequential nodes
     graph.add_node("fetch_repos",    fetch_repos_node)
+    graph.add_node("fetch_leetcode", fetch_leetcode_node)
     graph.add_node("filter_repos",   filter_repos_node)
     graph.add_node("fetch_readmes",  fetch_readmes_node)
     graph.add_node("router",         router_node)
@@ -209,9 +232,16 @@ def build_pipeline():
     # Final Synthesizer node
     graph.add_node("synthesize",     synthesize_node)
 
-    # Sequential edges
-    graph.set_entry_point("fetch_repos")
-    graph.add_edge("fetch_repos",   "filter_repos")
+    # fetch_repos and fetch_leetcode both run off the entry point, in
+    # parallel — they're independent data sources. filter_repos only needs
+    # raw_repos, but LangGraph waits for ALL incoming edges to a node before
+    # running it, so filter_repos naturally waits for both branches to finish
+    # even though it only reads GitHub state. This keeps LeetCode fetch time
+    # fully overlapped with GitHub fetch time instead of adding to it.
+    graph.add_edge(START, "fetch_repos")
+    graph.add_edge(START, "fetch_leetcode")
+    graph.add_edge("fetch_repos",    "filter_repos")
+    graph.add_edge("fetch_leetcode", "filter_repos")
     graph.add_edge("filter_repos",  "fetch_readmes")
     graph.add_edge("fetch_readmes", "router")
 
@@ -261,6 +291,7 @@ async def run_pipeline(
         "repos_with_readmes": [],
         "top_repos":          [],
         "repo_results":       [],
+        "leetcode_stats":     None,
         "final_portfolio":    {},
     })
 
