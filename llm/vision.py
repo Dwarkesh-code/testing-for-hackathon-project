@@ -27,6 +27,7 @@ def extract_candidate_images(readme: str, file_tree: List[str], repo_url: str, d
     """
     Finds image URLs or repo paths from README markdown and file tree.
     Returns list of dicts: [{'url': '...', 'caption': '...'}]
+    Limited to 5 candidates because the vision model supports a maximum of 5 images per request.
     """
     candidates = []
 
@@ -48,7 +49,7 @@ def extract_candidate_images(readme: str, file_tree: List[str], repo_url: str, d
             if not any(c["url"] == url for c in candidates):
                 candidates.append({"url": url, "caption": f"Asset: {f.split('/')[-1]}"})
 
-    return candidates[:8]
+    return candidates[:5]
 
 
 def analyze_best_screenshot(

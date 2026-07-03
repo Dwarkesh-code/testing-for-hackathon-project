@@ -93,7 +93,7 @@ class Config:
     # alias, which meant synthesis + vision-picking + extractor-fallback traffic
     # all piled onto a single Groq model/key pool. Split so each role is
     # independently tunable and easy to trace in usage dashboards.
-    SYNTHESIS_MODEL      = "llama-3.3-70b-versatile"                     # final portfolio copywriting only
+    SYNTHESIS_MODEL      = "mixtral-8x7b-32768"                          # final portfolio copywriting only
     VISION_PICKER_MODEL  = "meta-llama/llama-4-scout-17b-16e-instruct"   # vision-capable — actually looks at images
     EXTRACTOR_MODEL       = "meta/llama-3.3-70b-instruct"                 # NVIDIA fallback alias (synthesizer safety net)
 
