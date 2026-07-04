@@ -106,6 +106,13 @@ def _build_agents(chain_index: int) -> List[Tuple[str, str, Optional[str], Any]]
         except Exception as e:
             print(f"[Extractor] Could not init NVIDIA model {nvidia_model}: {e}")
 
+        for fallback_model in config.NVIDIA_EXTRACTOR_FALLBACKS:
+            try:
+                llm = ChatNVIDIA(model=fallback_model, api_key=nvidia_key, temperature=0.1)
+                agents.append(("nvidia", fallback_model, nvidia_key, create_react_agent(llm, GITHUB_TOOLS)))
+            except Exception as e:
+                print(f"[Extractor] Could not init NVIDIA fallback model {fallback_model}: {e}")
+
     if groq_key:
         for model in config.GROQ_EXTRACTOR_FALLBACKS:
             try:
